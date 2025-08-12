@@ -4,7 +4,7 @@ Ingestion and enrichment pipeline for Pogo receipt data, built with TypeScript, 
 
 ## Quick Start
 
-### **🚀 For Graders - 4 Simple Steps:**
+### **For Graders - 4 Simple Steps:**
 
 **Step 1:** Clone and install
 ```bash
@@ -32,9 +32,9 @@ cp .env.example .env
 pnpm start
 ```
 
-✅ **Done!** API available at `http://localhost:7646`
+**Done!** API available at `http://localhost:7646`
 
-### **🧪 Quick Test (Optional)**
+### **Quick Test (Optional)**
 ```bash
 # Test the health endpoint
 curl http://localhost:7646/health

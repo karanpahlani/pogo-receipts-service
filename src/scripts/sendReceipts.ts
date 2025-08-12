@@ -100,16 +100,16 @@ async function sendReceiptsToEndpoint({ endpoint, dryRun, delayMs, csvPath }: Se
                 });
 
                 if (response.ok) {
-                  console.log(`✅ Success: ${response.status}`);
+                  console.log(`Success: ${response.status}`);
                   successCount++;
                 } else {
-                  console.log(`❌ Failed: ${response.status} ${response.statusText}`);
+                  console.log(`Failed: ${response.status} ${response.statusText}`);
                   const errorText = await response.text();
                   console.log(`Error response: ${errorText}`);
                   errorCount++;
                 }
               } catch (error) {
-                console.log(`❌ Request failed: ${error}`);
+                console.log(`Request failed: ${error}`);
                 errorCount++;
               }
             }
@@ -120,10 +120,10 @@ async function sendReceiptsToEndpoint({ endpoint, dryRun, delayMs, csvPath }: Se
             }
           }
 
-          console.log(`\n📊 Summary:`);
-          console.log(`✅ Successful: ${successCount}`);
-          console.log(`❌ Failed: ${errorCount}`);
-          console.log(`📝 Total: ${receipts.length}`);
+          console.log(`\nSummary:`);
+          console.log(`Successful: ${successCount}`);
+          console.log(`Failed: ${errorCount}`);
+          console.log(`Total: ${receipts.length}`);
 
           resolve();
         } catch (error) {
@@ -180,7 +180,7 @@ if (import.meta.url === `file://${process.argv[1]}`) {
   sendReceiptsToEndpoint(argv)
     .then(() => process.exit(0))
     .catch(error => {
-      console.error('❌ Error:', error);
+      console.error('Error:', error);
       process.exit(1);
     });
 }

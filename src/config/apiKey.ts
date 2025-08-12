@@ -10,7 +10,7 @@ export async function getOpenAIApiKey(): Promise<string> {
   
   // If local key exists and is not empty, use it
   if (localKey && localKey !== '') {
-    console.log('🔑 Using local OpenAI API key');
+    console.log('Using local OpenAI API key');
     return localKey;
   }
 
@@ -21,14 +21,14 @@ export async function getOpenAIApiKey(): Promise<string> {
   }
 
   // If no local key, provide helpful guidance
-  console.log('ℹ️  No OpenAI API key found in environment variables.');
+  console.log('No OpenAI API key found in environment variables.');
   console.log('');
-  console.log('🔑 To get an API key for testing:');
+  console.log('To get an API key for testing:');
   console.log('   1. Visit: https://platform.openai.com/api-keys');
   console.log('   2. Create a new API key');
   console.log('   3. Add it to your .env file: OPENAI_API_KEY=your-key-here');
   console.log('');
-  console.log('💡 For graders: The take-home instructions should include the API key');
+  console.log('For graders: The take-home instructions should include the API key');
   console.log('   provided by Pogo for this assessment.');
   
   throw new Error(

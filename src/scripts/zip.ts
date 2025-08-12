@@ -82,12 +82,12 @@ function createZip() {
     const fileSizeMB = (stats.size / (1024 * 1024)).toFixed(2);
     const compressionTime = ((endTime - startTime) / 1000).toFixed(1);
 
-    console.log(`✅ Created ${zipFileName}`);
-    console.log(`📦 File size: ${fileSizeMB} MB`);
-    console.log(`⏱️  Compression time: ${compressionTime}s`);
-    console.log(`🎯 Ready for submission!`);
+    console.log(`Created ${zipFileName}`);
+    console.log(`File size: ${fileSizeMB} MB`);
+    console.log(`Compression time: ${compressionTime}s`);
+    console.log(`Ready for submission!`);
   } catch (error) {
-    console.error('❌ Failed to create zip file:', error);
+    console.error('Failed to create zip file:', error);
     process.exit(1);
   }
 }
