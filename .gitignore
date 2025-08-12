@@ -301,6 +301,19 @@ FakesAssemblies/
 .ntvs_analysis.dat
 node_modules/
 
+# TypeScript build output
+dist/
+
+# Environment variables
+.env
+.env.local
+.env.*.local
+
+# Logs
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
 # Visual Studio 6 build log
 *.plg
 
