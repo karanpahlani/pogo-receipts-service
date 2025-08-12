@@ -23,7 +23,8 @@ cp .env.example .env
 # Open .env in any text editor and replace this line:
 # OPENAI_API_KEY=your_openai_api_key_here
 # 
-# With the actual API key from your take-home instructions:
+# With the actual API key from this 1Password link:
+# https://share.1password.com/s#JmmPNp2Lvp9Xv4LhCFc0dkHBhFrmTYghI_sg-ko91n0
 # OPENAI_API_KEY=sk-...your-actual-key...
 ```
 
@@ -62,7 +63,8 @@ pnpm install
 2. **Setup environment:**
 ```bash
 cp .env.example .env
-# Edit .env and replace 'your_openai_api_key_here' with your actual API key
+# Edit .env and replace 'your_openai_api_key_here' with the API key from:
+# https://share.1password.com/s#JmmPNp2Lvp9Xv4LhCFc0dkHBhFrmTYghI_sg-ko91n0
 ```
 
 3. **Start the service:**
@@ -185,6 +187,7 @@ Configure your `.env` file:
 DATABASE_URL=postgresql://postgres:password@localhost:5444/pogo_data
 
 # OpenAI Configuration  
+# Get API key from: https://share.1password.com/s#JmmPNp2Lvp9Xv4LhCFc0dkHBhFrmTYghI_sg-ko91n0
 OPENAI_API_KEY=your_openai_api_key_here
 
 # Application Configuration
