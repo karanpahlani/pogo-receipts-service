@@ -1,17 +1,17 @@
 import 'dotenv/config';
-import express from 'express';
-import { db, receipts } from './db';
+import * as express from 'express';
+import { db, receipts } from './db/index.js';
 import { sql, eq } from 'drizzle-orm';
-import { asyncHandler, errorHandler, notFoundHandler } from './middleware';
+import { asyncHandler, errorHandler, notFoundHandler } from './middleware/index.js';
 
-const app = express();
+const app = express.default();
 const PORT = process.env.PORT || 7646;
 
-app.use(express.json());
+app.use(express.default.json());
 
 app.get(
   '/health',
-  asyncHandler(async (_req, res) => {
+  asyncHandler(async (_req: any, res: any) => {
     // Check database connection
     try {
       await db.execute(sql`SELECT 1`);
@@ -31,11 +31,11 @@ app.get(
 // Receipt ingestion endpoint
 app.post(
   '/',
-  asyncHandler(async (req, res) => {
+  asyncHandler(async (req: any, res: any) => {
     const receiptData = req.body;
     
     // Import enrichment functions
-    const { enrichReceiptData, standardizeBrand } = await import('./services/enrichment');
+    const { enrichReceiptData, standardizeBrand } = await import('./services/enrichment.js');
     
     // Perform enrichment if we have product description
     let enrichmentResult;
@@ -88,7 +88,7 @@ app.post(
 // Get receipt by ID endpoint
 app.get(
   '/receipts/:id',
-  asyncHandler(async (req, res) => {
+  asyncHandler(async (req: any, res: any) => {
     const { id } = req.params;
     
     const receipt = await db.select().from(receipts).where(eq(receipts.id, id)).limit(1);

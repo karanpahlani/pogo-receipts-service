@@ -1,4 +1,4 @@
-import { generateLLMText } from '../ai';
+import { generateLLMText } from '../ai/index.js';
 import { z } from 'zod';
 
 // Zod schema for structured AI output
