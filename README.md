@@ -1,94 +1,91 @@
 # Pogo Receipts Service
 
-A TypeScript-based receipt ingestion and enrichment pipeline that accepts raw receipt data via HTTP API and stores it in PostgreSQL.
+Ingestion and enrichment pipeline for Pogo receipt data, built with TypeScript, Postgres, and OpenAI-powered normalization.
 
 ## Quick Start
 
 ### Prerequisites
-- Node.js 18+ 
-- Docker and Docker Compose
-- npm
+- Node.js 24+
+- Docker and Docker Compose  
+- pnpm 8.6+
 
 ### Installation & Setup
 
 1. Clone and install dependencies:
 ```bash
-git clone <repository-url>
+git clone https://github.com/karanpahlani/pogo-receipts-service.git
 cd pogo-receipts-service
-npm install
+pnpm install
 ```
 
-2. Start the database:
+2. Configure environment:
 ```bash
-docker compose up -d db
+cp .env.example .env
+# Edit .env with your OpenAI API key
 ```
 
-3. Start the development server:
+3. Start the database and server:
 ```bash
-npm run dev
+pnpm start
 ```
 
-The API will be available at `http://localhost:3000`
+The API will be available at `http://localhost:7646`
 
 ## API Endpoints
 
 ### Health Check
 **GET** `/health`
-- Returns database connectivity status
-- **Response:** `{"ok": true}` or `{"ok": false}`
+- Returns server status
+- **Response:** `{"status": "ok", "timestamp": "2024-01-15T10:30:00.000Z"}`
 
 ### Receipt Ingestion
-**POST** `/receipts`
-- Ingests raw receipt data and stores in database
-- **Required fields:**
-  - `date` (string) - Receipt date in ISO format
-  - `storeName` (string) - Name of the store
-  - `total` (number) - Total amount spent
+**POST** `/`
+- Ingests raw receipt data with AI-powered enrichment
+- Accepts flexible receipt data format
+- Auto-generates UUID for each receipt
 
 **Example Request:**
 ```bash
-curl -X POST http://localhost:3000/receipts \
+curl -X POST http://localhost:7646/ \
   -H "Content-Type: application/json" \
   -d '{
-    "date": "2024-01-15T10:30:00Z",
-    "storeName": "Target", 
-    "total": 45.67,
-    "product_description": "Optional additional fields..."
+    "merchant_name": "Apple Store",
+    "product_description": "MacBook Pro 13-inch M2",
+    "price": 1299.99
   }'
 ```
 
-**Success Response (201):**
+**Success Response (200):**
 ```json
 {
   "message": "Receipt ingested successfully",
-  "id": 1,
-  "date": "2024-01-15T10:30:00Z",
-  "storeName": "Target",
-  "total": 45.67
+  "id": "e84d63a9-900f-491f-9b6f-f69752577471",
+  "enrichment": {
+    "brand": "Apple",
+    "category": ["Electronics", "Computers", "Laptops"],
+    "confidence": "high"
+  }
 }
 ```
 
-**Validation Error (400):**
-```json
-{
-  "error": "Missing required fields: date, storeName, total",
-  "message": "Required fields must be: date (string), storeName (string), total (number)"
-}
-```
+### Receipt Retrieval
+**GET** `/receipts/:id`
+- Retrieves receipt data by UUID
+- **Response:** Complete receipt with enrichment data
 
 ## Architecture
 
 ```
-┌─────────────────┐    HTTP POST     ┌─────────────────┐
-│   Client App    │ ────────────────▶│   Express API   │
-│                 │                  │   (Port 3000)   │
-└─────────────────┘                  └─────────┬───────┘
+┌─────────────────┐    HTTP POST     ┌─────────────────┐      ┌─────────────────┐
+│   Client App    │ ────────────────▶│   Express API   │────▶ │   OpenAI API    │
+│                 │                  │   (Port 7646)   │      │   (Enrichment)  │
+└─────────────────┘                  └─────────┬───────┘      └─────────────────┘
                                                │
                                                ▼
                                      ┌─────────────────┐
                                      │  PostgreSQL DB  │
-                                     │   (Port 5432)   │
-                                     │                 │
+                                     │   (Port 5444)   │
+                                     │ Drizzle ORM     │
                                      │ ┌─────────────┐ │
                                      │ │ receipts    │ │
                                      │ │ table       │ │
@@ -97,144 +94,159 @@ curl -X POST http://localhost:3000/receipts \
 ```
 
 ### Components:
-- **Express Server** (`src/server.ts`) - HTTP API server with JSON middleware
-- **Database Layer** (`src/db.ts`) - PostgreSQL connection and schema management
-- **Routes** (`src/routes/receipts.ts`) - Receipt ingestion endpoint with validation
+- **Express Server** (`src/index.ts`) - Main API server with async error handling
+- **AI Enrichment** (`src/services/enrichment.ts`) - OpenAI-powered data normalization
+- **Database Layer** (`src/db/` directory) - Drizzle ORM with PostgreSQL
+- **Schemas** (`src/db/schemas.ts`) - Database schema definitions with enrichment fields
 - **Docker Setup** (`docker-compose.yml`) - Containerized PostgreSQL database
 
 ## Database Schema
 
-```sql
-CREATE TABLE receipts (
-  id SERIAL PRIMARY KEY,
-  date TIMESTAMP NOT NULL,
-  store_name VARCHAR(255) NOT NULL, 
-  total DECIMAL(10, 2) NOT NULL,
-  -- Additional optional fields for future enrichment
-  receipt_id VARCHAR(255),
-  product_id VARCHAR(255), 
-  product_description TEXT,
-  brand VARCHAR(255),
-  product_category JSONB,
-  enriched_brand VARCHAR(255),
-  enriched_category JSONB,
-  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-);
+Built with Drizzle ORM for type-safe database operations:
+
+```typescript
+export const receipts = pgTable('receipts', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  receiptId: text('receipt_id'),
+  productId: text('product_id'),
+  receiptCreatedTimestamp: timestamp('receipt_created_timestamp'),
+  merchantName: text('merchant_name'),
+  productDescription: text('product_description'),
+  brand: text('brand'),
+  productCategory: jsonb('product_category'),
+  totalPricePaid: text('total_price_paid'),
+  productCode: text('product_code'),
+  productImageUrl: text('product_image_url'),
+  // AI Enrichment fields
+  enrichedBrand: text('enriched_brand'),
+  enrichedCategory: jsonb('enriched_category'),
+  enrichmentConfidence: text('enrichment_confidence'),
+  createdAt: timestamp('created_at').defaultNow(),
+  updatedAt: timestamp('updated_at').defaultNow(),
+});
 ```
 
 ## Development
 
 ### Available Scripts
-- `npm run dev` - Start development server with hot reload
-- `npm run build` - Compile TypeScript to JavaScript
-- `npm start` - Run compiled JavaScript (production)
+- `pnpm start` - Start database and development server with hot reload
+- `pnpm build` - Compile TypeScript to JavaScript  
+- `pnpm db:generate` - Generate database migrations
+- `pnpm db:migrate` - Run database migrations
+- `pnpm db:studio` - Open Drizzle Studio for database management
+- `pnpm format` - Format code with Prettier
+- `pnpm typecheck` - Run TypeScript type checking
 
 ### Environment Variables
-Create a `.env` file:
+Configure your `.env` file:
 ```env
-DATABASE_URL=postgres://postgres:postgres@localhost:5432/pogo
-PORT=3000
+# Database Configuration
+DATABASE_URL=postgresql://postgres:password@localhost:5444/pogo_data
+
+# OpenAI Configuration  
+OPENAI_API_KEY=your_openai_api_key_here
+
+# Application Configuration
+PORT=7646
 NODE_ENV=development
 ```
 
 ### Docker Commands
 ```bash
-# Start database only
-docker compose up -d db
+# Start database and server
+pnpm start
 
-# Start full stack (requires Dockerfile)
-docker compose up -d
+# Start database only
+docker-compose up -d
 
 # Stop services
-docker compose down
+docker-compose down
 
 # View logs
-docker compose logs -f
+docker-compose logs -f postgres
 ```
 
 ## Testing the API
 
 ### Test Receipt Ingestion:
 ```bash
-# Valid receipt
-curl -X POST http://localhost:3000/receipts \
+# Test with Apple Store receipt
+curl -X POST http://localhost:7646/ \
   -H "Content-Type: application/json" \
   -d '{
-    "date": "2024-01-15T14:30:00Z",
-    "storeName": "Walmart",
-    "total": 89.45
+    "merchant_name": "Apple Store",
+    "product_description": "MacBook Pro 13-inch M2",
+    "price": 1299.99
   }'
 
-# Test validation
-curl -X POST http://localhost:3000/receipts \
+# Test with flexible receipt data
+curl -X POST http://localhost:7646/ \
   -H "Content-Type: application/json" \
-  -d '{"storeName": "Target"}'
+  -d '{
+    "MERCHANT_NAME": "Target",
+    "PRODUCT_DESCRIPTION": "Nike Air Max sneakers",
+    "BRAND": "Nike"
+  }'
 ```
 
-### Check Database Connection:
+### Retrieve Receipt:
 ```bash
-curl http://localhost:3000/health
+# Replace with actual UUID from ingestion response
+curl http://localhost:7646/receipts/e84d63a9-900f-491f-9b6f-f69752577471
 ```
 
-## Next Steps and Production Considerations
-
-### Immediate Enhancements
-1. **Data Enrichment Pipeline**
-   - Integrate OpenAI API for product categorization
-   - Implement brand name standardization
-   - Add receipt parsing for structured data extraction
-
-2. **Batch Processing**
-   - Support bulk receipt uploads
-   - Add CSV import functionality
-   - Implement async processing queue
-
-3. **Validation & Error Handling**
-   - Add date format validation
-   - Implement duplicate detection
-   - Enhanced error logging and monitoring
-
-### Scaling Considerations
-1. **Database**
-   - Add indexes for common queries
-   - Implement connection pooling
-   - Consider read replicas for analytics
-
-2. **API Layer** 
-   - Add rate limiting
-   - Implement authentication/authorization
-   - Add request logging and metrics
-
-3. **Infrastructure**
-   - Container orchestration (Kubernetes)
-   - Load balancing
-   - Monitoring and alerting setup
-
-### Production Deployment
-```yaml
-# docker-compose.prod.yml example
-version: '3.9'
-services:
-  api:
-    build: .
-    environment:
-      - NODE_ENV=production
-      - DATABASE_URL=postgres://user:pass@prod-db:5432/pogo
-    deploy:
-      replicas: 3
-      resources:
-        limits:
-          memory: 512M
-        reservations:
-          memory: 256M
+### Check Server Health:
+```bash
+curl http://localhost:7646/health
 ```
 
-## Monitoring & Observability
+## Features
 
-Future monitoring setup recommendations:
-- Health check endpoints for Kubernetes probes
-- Structured logging with correlation IDs
-- Metrics collection (Prometheus/Grafana)
-- Error tracking (Sentry)
-- Database query performance monitoring
+### AI-Powered Data Enrichment
+- **Brand Standardization**: Normalizes brand names (e.g., "amazon.com" → "Amazon")
+- **Category Classification**: Multi-level product categorization using OpenAI
+- **Confidence Scoring**: High/medium/low confidence ratings for enrichment quality
+- **Flexible Input**: Handles various receipt data formats and field naming conventions
+
+### Current Capabilities
+- Receipt ingestion with automatic UUID generation
+- Real-time AI enrichment using OpenAI GPT-4o-mini
+- Type-safe database operations with Drizzle ORM
+- Structured error handling and validation
+- Health monitoring endpoints
+
+### Production Features
+- **Database Migrations**: Automated schema management with Drizzle Kit
+- **Docker Integration**: Containerized PostgreSQL setup
+- **TypeScript**: Full type safety across the application
+- **Modern Tooling**: pnpm, tsx for fast development iteration
+
+## Technical Stack
+
+- **Runtime**: Node.js 24+ with ES modules
+- **Language**: TypeScript with strict type checking
+- **Framework**: Express.js with async error handling
+- **Database**: PostgreSQL 16 with Drizzle ORM
+- **AI Integration**: OpenAI API via AI SDK
+- **Package Manager**: pnpm for efficient dependency management
+- **Development**: tsx for fast TypeScript execution
+- **Containerization**: Docker Compose for local development
+
+## Project Structure
+
+```
+src/
+├── index.ts              # Main server and API endpoints
+├── ai.ts                 # OpenAI integration wrapper  
+├── services/
+│   └── enrichment.ts     # AI enrichment logic
+├── db/
+│   ├── connection.ts     # Database connection setup
+│   ├── schemas.ts        # Drizzle schema definitions
+│   └── migrations/       # Database migration files
+├── middleware/
+│   └── errorHandler.ts   # Express error handling
+└── scripts/
+    ├── healthcheck.ts    # Health check utility
+    └── sendReceipts.ts   # Testing utilities
+```
