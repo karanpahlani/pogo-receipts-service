@@ -1,5 +1,5 @@
 import { drizzle } from 'drizzle-orm/node-postgres';
-import * as pg from 'pg';
+import { Pool } from "pg";
 import * as schema from './schemas.js';
 
 const DATABASE_URL = process.env.DATABASE_URL;
@@ -7,7 +7,7 @@ if (!DATABASE_URL) {
   throw new Error('DATABASE_URL environment variable not set');
 }
 
-const pool = new pg.Pool({
+const pool = new Pool({
   connectionString: DATABASE_URL,
   max: 10,
   ssl: false,

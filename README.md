@@ -294,3 +294,335 @@ src/
     ├── healthcheck.ts    # Health check utility
     └── sendReceipts.ts   # Testing utilities
 ```
+
+## Evolution to ELT Pipeline & Adding New Data Sources
+
+### Current Architecture (ETL)
+The current implementation follows an **ETL** (Extract, Transform, Load) pattern:
+1. **Extract**: Data comes via HTTP POST endpoint
+2. **Transform**: AI enrichment happens in-memory before storage
+3. **Load**: Enriched data is stored in PostgreSQL
+
+### Evolution to ELT Pipeline
+
+To evolve this into a production **ELT** (Extract, Load, Transform) pipeline:
+
+#### Phase 1: Separate Ingestion from Enrichment
+```
+┌─────────────┐    ┌─────────────┐    ┌─────────────┐    ┌─────────────┐
+│   Sources   │───▶│  Ingestion  │───▶│   Raw Data  │───▶│ Enrichment  │
+│             │    │   Service   │    │   Storage   │    │   Service   │
+└─────────────┘    └─────────────┘    └─────────────┘    └─────────────┘
+```
+
+**Changes needed:**
+- Split `/` endpoint into `/ingest` (raw data only) and background enrichment job
+- Add `raw_receipts` table for unprocessed data
+- Create `enrichment_queue` table for async processing
+- Implement worker service for enrichment processing
+
+#### Phase 2: Add Message Queue
+```
+┌─────────────┐    ┌─────────────┐    ┌─────────────┐
+│  Ingestion  │───▶│  Queue      │───▶│ Enrichment  │
+│  Service    │    │ (Redis/SQS) │    │  Workers    │
+└─────────────┘    └─────────────┘    └─────────────┘
+```
+
+**Benefits:**
+- Decoupled processing allows independent scaling
+- Retry logic for failed enrichments
+- Better monitoring and observability
+- Multiple workers can process in parallel
+
+### Adding New Data Sources
+
+The current architecture makes adding new sources straightforward:
+
+#### 1. File-Based Sources (CSV, JSON)
+```typescript
+// src/services/fileIngestion.ts
+export async function processCsvFile(filePath: string) {
+  const records = await parseCSV(filePath);
+  for (const record of records) {
+    await ingestReceipt(transformCsvToReceipt(record));
+  }
+}
+```
+
+#### 2. API-Based Sources (Third-party APIs)
+```typescript
+// src/services/apiIngestion.ts
+export async function syncFromPartnerAPI() {
+  const client = new PartnerAPIClient();
+  const receipts = await client.getRecentReceipts();
+  
+  for (const receipt of receipts) {
+    await ingestReceipt(transformPartnerFormatToReceipt(receipt));
+  }
+}
+```
+
+#### 3. Real-time Sources (Webhooks, Kafka)
+```typescript
+// src/routes/webhooks.ts
+app.post('/webhooks/partner', async (req, res) => {
+  const receiptData = transformWebhookToReceipt(req.body);
+  await enqueueForEnrichment(receiptData);
+  res.status(200).send('OK');
+});
+```
+
+### Proposed ELT Architecture
+
+```
+                    ┌─────────────────┐
+                    │   Data Lake     │
+                    │ (Raw JSONs/CSVs)│
+                    └─────────────────┘
+                            │
+┌─────────────┐    ┌─────────────────┐    ┌─────────────┐
+│  HTTP APIs  │───▶│                 │───▶│             │
+├─────────────┤    │   Ingestion     │    │   Raw Data  │
+│ File Uploads│───▶│   Service       │───▶│   Storage   │
+├─────────────┤    │                 │    │ PostgreSQL  │
+│  Webhooks   │───▶│                 │    │             │
+└─────────────┘    └─────────────────┘    └─────────────┘
+                            │                      │
+                    ┌─────────────────┐            │
+                    │  Message Queue  │◀───────────┘
+                    │  (Redis/SQS)    │
+                    └─────────────────┘
+                            │
+                    ┌─────────────────┐    ┌─────────────┐
+                    │   Enrichment    │───▶│  Enriched   │
+                    │    Workers      │    │    Data     │
+                    │                 │    │ PostgreSQL  │
+                    └─────────────────┘    └─────────────┘
+                            │
+                    ┌─────────────────┐
+                    │   Analytics     │
+                    │   & Reports     │
+                    └─────────────────┘
+```
+
+**Key Components:**
+- **Ingestion Service**: Handles all data sources, minimal transformation
+- **Message Queue**: Decouples ingestion from processing
+- **Enrichment Workers**: Scalable AI processing with retry logic
+- **Data Lake**: Raw data backup for reprocessing
+- **Monitoring**: Health checks, metrics, alerting
+
+## Deployment & Scaling Strategy
+
+### Production Deployment Options
+
+#### Option 1: Cloud-Native (AWS)
+```
+┌─────────────────┐    ┌─────────────────┐    ┌─────────────────┐
+│   API Gateway   │───▶│  ECS/Fargate    │───▶│   RDS/Aurora    │
+│  (Rate Limiting)│    │ (Auto-scaling)  │    │  (PostgreSQL)   │
+└─────────────────┘    └─────────────────┘    └─────────────────┘
+         │                       │                       │
+         │              ┌─────────────────┐              │
+         │              │   Amazon SQS    │              │
+         │              │ (Message Queue) │              │
+         │              └─────────────────┘              │
+         │                       │                       │
+         ▼              ┌─────────────────┐              ▼
+┌─────────────────┐    │  Lambda/Fargate │    ┌─────────────────┐
+│   CloudWatch    │    │ (AI Enrichment) │    │   ElastiCache   │
+│   (Monitoring)  │    │   Workers       │    │   (Redis)       │
+└─────────────────┘    └─────────────────┘    └─────────────────┘
+```
+
+**Components:**
+- **API Gateway**: Request routing, rate limiting, authentication
+- **ECS/Fargate**: Containerized API service with auto-scaling
+- **RDS Aurora**: Managed PostgreSQL with read replicas
+- **SQS**: Message queue for async enrichment processing
+- **Lambda**: Serverless enrichment workers (cost-effective for sporadic loads)
+- **ElastiCache**: Redis for caching and session management
+- **CloudWatch**: Comprehensive monitoring and alerting
+
+#### Option 2: Kubernetes (Multi-cloud)
+```
+┌─────────────────┐    ┌─────────────────┐    ┌─────────────────┐
+│     Ingress     │───▶│   API Service   │───▶│   PostgreSQL    │
+│   (Load Balancer)│   │  (3+ replicas)  │    │    (StatefulSet)│
+└─────────────────┘    └─────────────────┘    └─────────────────┘
+         │                       │                       │
+         │              ┌─────────────────┐              │
+         │              │     Redis       │              │
+         │              │  (Message Queue)│              │
+         │              └─────────────────┘              │
+         │                       │                       │
+         ▼              ┌─────────────────┐              ▼
+┌─────────────────┐    │   Enrichment    │    ┌─────────────────┐
+│   Prometheus    │    │    Workers      │    │      PVC        │
+│   Grafana       │    │ (HPA enabled)   │    │   (Storage)     │
+└─────────────────┘    └─────────────────┘    └─────────────────┘
+```
+
+**Key Features:**
+- **Horizontal Pod Autoscaling**: Scale based on CPU/memory/custom metrics
+- **StatefulSets**: For databases with persistent storage
+- **ConfigMaps/Secrets**: Environment configuration management
+- **Service Mesh**: Istio for traffic management and security
+- **Helm Charts**: Templated deployments across environments
+
+### Scaling Strategies
+
+#### Horizontal Scaling
+1. **API Service Scaling**
+   ```yaml
+   # Kubernetes HPA example
+   apiVersion: autoscaling/v2
+   kind: HorizontalPodAutoscaler
+   metadata:
+     name: receipts-api-hpa
+   spec:
+     scaleTargetRef:
+       apiVersion: apps/v1
+       kind: Deployment
+       name: receipts-api
+     minReplicas: 3
+     maxReplicas: 20
+     metrics:
+     - type: Resource
+       resource:
+         name: cpu
+         target:
+           type: Utilization
+           averageUtilization: 70
+   ```
+
+2. **Database Read Scaling**
+   - Read replicas for query distribution
+   - Connection pooling (PgBouncer)
+   - Query result caching (Redis)
+
+3. **AI Enrichment Scaling**
+   - Separate worker processes from API
+   - Queue-based processing with multiple consumers
+   - Rate limiting for OpenAI API calls
+
+#### Vertical Scaling
+- **Database**: Upgrade instance types during low-traffic windows
+- **API Service**: Increase CPU/memory limits based on profiling
+- **Redis**: Memory optimization for caching layer
+
+### Performance Optimizations
+
+#### Database Optimizations
+```sql
+-- Indexing strategy
+CREATE INDEX CONCURRENTLY idx_receipts_merchant ON receipts(merchant_name);
+CREATE INDEX CONCURRENTLY idx_receipts_created ON receipts(receipt_created_timestamp);
+CREATE INDEX CONCURRENTLY idx_receipts_enrichment ON receipts(enrichment_confidence) WHERE enrichment_confidence IS NOT NULL;
+
+-- Partitioning for large datasets
+CREATE TABLE receipts_2024 PARTITION OF receipts 
+FOR VALUES FROM ('2024-01-01') TO ('2025-01-01');
+```
+
+#### Caching Strategy
+```typescript
+// Multi-level caching
+class CacheService {
+  // L1: In-memory (Node.js)
+  private memoryCache = new Map();
+  
+  // L2: Redis (shared across instances)
+  private redisClient = new Redis(process.env.REDIS_URL);
+  
+  async get(key: string) {
+    // Check memory first
+    if (this.memoryCache.has(key)) {
+      return this.memoryCache.get(key);
+    }
+    
+    // Then Redis
+    const cached = await this.redisClient.get(key);
+    if (cached) {
+      this.memoryCache.set(key, JSON.parse(cached));
+      return JSON.parse(cached);
+    }
+    
+    return null;
+  }
+}
+```
+
+#### API Rate Limiting & Circuit Breakers
+```typescript
+// OpenAI API circuit breaker
+import { CircuitBreaker } from 'opossum';
+
+const openaiBreaker = new CircuitBreaker(openai.chat.completions.create, {
+  timeout: 10000,
+  errorThresholdPercentage: 50,
+  resetTimeout: 30000
+});
+
+// Graceful degradation
+openaiBreaker.fallback(() => ({
+  brand: 'unknown',
+  category: ['unknown'],
+  confidence: 'low'
+}));
+```
+
+### Monitoring & Observability
+
+#### Metrics to Track
+- **API Metrics**: Request rate, response time, error rate
+- **Database Metrics**: Connection pool usage, query performance, lock waits
+- **Enrichment Metrics**: Queue depth, processing time, AI API success rate
+- **Business Metrics**: Receipts processed per hour, enrichment accuracy
+
+#### Alerting Strategy
+```yaml
+# Example Prometheus alert rules
+groups:
+- name: receipts-service
+  rules:
+  - alert: HighErrorRate
+    expr: rate(http_requests_total{status=~"5.."}[5m]) > 0.1
+    for: 2m
+    labels:
+      severity: warning
+    annotations:
+      summary: "High error rate detected"
+      
+  - alert: EnrichmentQueueBacklog
+    expr: enrichment_queue_size > 1000
+    for: 5m
+    labels:
+      severity: critical
+    annotations:
+      summary: "Enrichment queue backing up"
+```
+
+### Cost Optimization
+
+#### Resource Right-sizing
+- **Development**: Smaller instances, shared databases
+- **Staging**: Production-like but reduced capacity
+- **Production**: Auto-scaling with appropriate limits
+
+#### Serverless for Variable Workloads
+```typescript
+// AWS Lambda for enrichment workers
+export const handler = async (event: SQSEvent) => {
+  for (const record of event.Records) {
+    const receiptData = JSON.parse(record.body);
+    await enrichReceipt(receiptData);
+  }
+};
+```
+
+**Benefits:**
+- Pay only for actual processing time
+- Automatic scaling to zero during idle periods
+- No server management overhead
