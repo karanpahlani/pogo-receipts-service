@@ -4,48 +4,6 @@ Ingestion and enrichment pipeline for Pogo receipt data, built with TypeScript, 
 
 ## Quick Start
 
-### **For Graders - 4 Simple Steps:**
-
-**Step 1:** Clone and install
-```bash
-git clone https://github.com/karanpahlani/pogo-receipts-service.git
-cd pogo-receipts-service
-pnpm install
-```
-
-**Step 2:** Setup environment
-```bash
-cp .env.example .env
-```
-
-**Step 3:** Add API key
-```bash
-# Open .env in any text editor and replace this line:
-# OPENAI_API_KEY=your_openai_api_key_here
-# 
-# With the actual API key from this 1Password link:
-# https://share.1password.com/s#JmmPNp2Lvp9Xv4LhCFc0dkHBhFrmTYghI_sg-ko91n0
-# OPENAI_API_KEY=sk-...your-actual-key...
-```
-
-**Step 4:** Start the service
-```bash
-pnpm start
-```
-
-**Done!** API available at `http://localhost:7646`
-
-### **Quick Test (Optional)**
-```bash
-# Test the health endpoint
-curl http://localhost:7646/health
-
-# Test receipt ingestion
-curl -X POST http://localhost:7646/ \
-  -H "Content-Type: application/json" \
-  -d '{"merchant_name": "Apple Store", "product_description": "MacBook Pro"}'
-```
-
 ### Prerequisites
 - Node.js 24+
 - Docker and Docker Compose  
@@ -53,7 +11,7 @@ curl -X POST http://localhost:7646/ \
 
 ### Installation & Setup
 
-1. Clone and install dependencies:
+1. **Clone and install dependencies:**
 ```bash
 git clone https://github.com/karanpahlani/pogo-receipts-service.git
 cd pogo-receipts-service
@@ -67,12 +25,17 @@ cp .env.example .env
 # https://share.1password.com/s#JmmPNp2Lvp9Xv4LhCFc0dkHBhFrmTYghI_sg-ko91n0
 ```
 
-3. **Start the service:**
+3. **Start both PostgreSQL and the service:**
 ```bash
 pnpm start
 ```
 
-The API will be available at `http://localhost:7646`
+This will build and start both PostgreSQL and the Node.js service. The API will be available at `http://localhost:7646`
+
+**Alternative for development (local Node.js):**
+```bash
+pnpm dev
+```
 
 ## API Endpoints
 
@@ -82,27 +45,34 @@ The API will be available at `http://localhost:7646`
 - **Response:** `{"status": "ok", "timestamp": "2024-01-15T10:30:00.000Z"}`
 
 ### Receipt Ingestion
-**POST** `/`
+**POST** `/receipt`
 - Ingests raw receipt data with AI-powered enrichment
 - Accepts flexible receipt data format
-- Auto-generates UUID for each receipt
+- Uses `receipt_id` from the data as primary key
 
 **Example Request:**
 ```bash
-curl -X POST http://localhost:7646/ \
+curl -X POST http://localhost:7646/receipt \
   -H "Content-Type: application/json" \
   -d '{
+    "receipt_id": "RCP12345",
+    "product_id": "PRD67890",
+    "receipt_created_timestamp": "2024-08-12T10:30:00Z",
     "merchant_name": "Apple Store",
     "product_description": "MacBook Pro 13-inch M2",
-    "price": 1299.99
+    "brand": "Apple",
+    "product_category": ["Electronics", "Computers", "Laptops"],
+    "total_price_paid": 1299.99,
+    "product_code": "MBPM2-13",
+    "product_image_url": "https://example.com/macbook.jpg"
   }'
 ```
 
-**Success Response (200):**
+**Success Response (201):**
 ```json
 {
   "message": "Receipt ingested successfully",
-  "id": "e84d63a9-900f-491f-9b6f-f69752577471",
+  "receipt_id": "RCP12345",
   "enrichment": {
     "brand": "Apple",
     "category": ["Electronics", "Computers", "Laptops"],
@@ -112,8 +82,8 @@ curl -X POST http://localhost:7646/ \
 ```
 
 ### Receipt Retrieval
-**GET** `/receipts/:id`
-- Retrieves receipt data by UUID
+**GET** `/receipt/:receipt_id`
+- Retrieves receipt data by receipt_id
 - **Response:** Complete receipt with enrichment data
 
 ## Architecture
@@ -141,7 +111,7 @@ curl -X POST http://localhost:7646/ \
 - **AI Enrichment** (`src/services/enrichment.ts`) - OpenAI-powered data normalization
 - **Database Layer** (`src/db/` directory) - Drizzle ORM with PostgreSQL
 - **Schemas** (`src/db/schemas.ts`) - Database schema definitions with enrichment fields
-- **Docker Setup** (`docker-compose.yml`) - Containerized PostgreSQL database
+- **Docker Setup** (`docker-compose.yml`) - Containerized PostgreSQL and Node.js service
 
 ## Database Schema
 
@@ -172,7 +142,8 @@ export const receipts = pgTable('receipts', {
 ## Development
 
 ### Available Scripts
-- `pnpm start` - Start database and development server with hot reload
+- `pnpm start` - Start both PostgreSQL and Node.js service with Docker Compose
+- `pnpm dev` - Start PostgreSQL with Docker, run Node.js locally with hot reload
 - `pnpm build` - Compile TypeScript to JavaScript  
 - `pnpm db:generate` - Generate database migrations
 - `pnpm db:migrate` - Run database migrations
@@ -181,67 +152,45 @@ export const receipts = pgTable('receipts', {
 - `pnpm typecheck` - Run TypeScript type checking
 
 ### Environment Variables
-Configure your `.env` file:
 ```env
-# Database Configuration
 DATABASE_URL=postgresql://postgres:password@localhost:5444/pogo_data
-
-# OpenAI Configuration  
-# Get API key from: https://share.1password.com/s#JmmPNp2Lvp9Xv4LhCFc0dkHBhFrmTYghI_sg-ko91n0
 OPENAI_API_KEY=your_openai_api_key_here
-
-# Application Configuration
 PORT=7646
 NODE_ENV=development
 ```
 
-### Docker Commands
+### Docker Usage
 ```bash
-# Start database and server
-pnpm start
+# Start both services (recommended)
+docker-compose up --build
 
-# Start database only
-docker-compose up -d
+# Start in background
+docker-compose up -d --build
 
 # Stop services
 docker-compose down
 
 # View logs
+docker-compose logs -f receipts-service
 docker-compose logs -f postgres
+
+# Rebuild and restart
+docker-compose up --build --force-recreate
 ```
 
 ## Testing the API
 
-### Test Receipt Ingestion:
 ```bash
-# Test with Apple Store receipt
-curl -X POST http://localhost:7646/ \
-  -H "Content-Type: application/json" \
-  -d '{
-    "merchant_name": "Apple Store",
-    "product_description": "MacBook Pro 13-inch M2",
-    "price": 1299.99
-  }'
-
-# Test with flexible receipt data
-curl -X POST http://localhost:7646/ \
-  -H "Content-Type: application/json" \
-  -d '{
-    "MERCHANT_NAME": "Target",
-    "PRODUCT_DESCRIPTION": "Nike Air Max sneakers",
-    "BRAND": "Nike"
-  }'
-```
-
-### Retrieve Receipt:
-```bash
-# Replace with actual UUID from ingestion response
-curl http://localhost:7646/receipts/e84d63a9-900f-491f-9b6f-f69752577471
-```
-
-### Check Server Health:
-```bash
+# Health check
 curl http://localhost:7646/health
+
+# Receipt ingestion
+curl -X POST http://localhost:7646/receipt \
+  -H "Content-Type: application/json" \
+  -d '{"receipt_id": "RCP12345", "merchant_name": "Apple Store", "product_description": "MacBook Pro 13-inch M2", "total_price_paid": 1299.99}'
+
+# Retrieve receipt (replace with actual receipt_id)
+curl http://localhost:7646/receipt/RCP12345
 ```
 
 ## Features
@@ -413,216 +362,14 @@ app.post('/webhooks/partner', async (req, res) => {
 - **Data Lake**: Raw data backup for reprocessing
 - **Monitoring**: Health checks, metrics, alerting
 
-## Deployment & Scaling Strategy
+## Deployment & Scaling
 
-### Production Deployment Options
-
-#### Option 1: Cloud-Native (AWS)
-```
-┌─────────────────┐    ┌─────────────────┐    ┌─────────────────┐
-│   API Gateway   │───▶│  ECS/Fargate    │───▶│   RDS/Aurora    │
-│  (Rate Limiting)│    │ (Auto-scaling)  │    │  (PostgreSQL)   │
-└─────────────────┘    └─────────────────┘    └─────────────────┘
-         │                       │                       │
-         │              ┌─────────────────┐              │
-         │              │   Amazon SQS    │              │
-         │              │ (Message Queue) │              │
-         │              └─────────────────┘              │
-         │                       │                       │
-         ▼              ┌─────────────────┐              ▼
-┌─────────────────┐    │  Lambda/Fargate │    ┌─────────────────┐
-│   CloudWatch    │    │ (AI Enrichment) │    │   ElastiCache   │
-│   (Monitoring)  │    │   Workers       │    │   (Redis)       │
-└─────────────────┘    └─────────────────┘    └─────────────────┘
-```
-
-**Components:**
-- **API Gateway**: Request routing, rate limiting, authentication
-- **ECS/Fargate**: Containerized API service with auto-scaling
-- **RDS Aurora**: Managed PostgreSQL with read replicas
-- **SQS**: Message queue for async enrichment processing
-- **Lambda**: Serverless enrichment workers (cost-effective for sporadic loads)
-- **ElastiCache**: Redis for caching and session management
-- **CloudWatch**: Comprehensive monitoring and alerting
-
-#### Option 2: Kubernetes (Multi-cloud)
-```
-┌─────────────────┐    ┌─────────────────┐    ┌─────────────────┐
-│     Ingress     │───▶│   API Service   │───▶│   PostgreSQL    │
-│   (Load Balancer)│   │  (3+ replicas)  │    │    (StatefulSet)│
-└─────────────────┘    └─────────────────┘    └─────────────────┘
-         │                       │                       │
-         │              ┌─────────────────┐              │
-         │              │     Redis       │              │
-         │              │  (Message Queue)│              │
-         │              └─────────────────┘              │
-         │                       │                       │
-         ▼              ┌─────────────────┐              ▼
-┌─────────────────┐    │   Enrichment    │    ┌─────────────────┐
-│   Prometheus    │    │    Workers      │    │      PVC        │
-│   Grafana       │    │ (HPA enabled)   │    │   (Storage)     │
-└─────────────────┘    └─────────────────┘    └─────────────────┘
-```
-
-**Key Features:**
-- **Horizontal Pod Autoscaling**: Scale based on CPU/memory/custom metrics
-- **StatefulSets**: For databases with persistent storage
-- **ConfigMaps/Secrets**: Environment configuration management
-- **Service Mesh**: Istio for traffic management and security
-- **Helm Charts**: Templated deployments across environments
+### Production Options
+- **Cloud-Native (AWS)**: ECS/Fargate + RDS Aurora + SQS + Lambda workers
+- **Kubernetes**: Multi-replica API service + StatefulSet PostgreSQL + HPA scaling
+- **Serverless**: Lambda functions for variable workloads with pay-per-use pricing
 
 ### Scaling Strategies
-
-#### Horizontal Scaling
-1. **API Service Scaling**
-   ```yaml
-   # Kubernetes HPA example
-   apiVersion: autoscaling/v2
-   kind: HorizontalPodAutoscaler
-   metadata:
-     name: receipts-api-hpa
-   spec:
-     scaleTargetRef:
-       apiVersion: apps/v1
-       kind: Deployment
-       name: receipts-api
-     minReplicas: 3
-     maxReplicas: 20
-     metrics:
-     - type: Resource
-       resource:
-         name: cpu
-         target:
-           type: Utilization
-           averageUtilization: 70
-   ```
-
-2. **Database Read Scaling**
-   - Read replicas for query distribution
-   - Connection pooling (PgBouncer)
-   - Query result caching (Redis)
-
-3. **AI Enrichment Scaling**
-   - Separate worker processes from API
-   - Queue-based processing with multiple consumers
-   - Rate limiting for OpenAI API calls
-
-#### Vertical Scaling
-- **Database**: Upgrade instance types during low-traffic windows
-- **API Service**: Increase CPU/memory limits based on profiling
-- **Redis**: Memory optimization for caching layer
-
-### Performance Optimizations
-
-#### Database Optimizations
-```sql
--- Indexing strategy
-CREATE INDEX CONCURRENTLY idx_receipts_merchant ON receipts(merchant_name);
-CREATE INDEX CONCURRENTLY idx_receipts_created ON receipts(receipt_created_timestamp);
-CREATE INDEX CONCURRENTLY idx_receipts_enrichment ON receipts(enrichment_confidence) WHERE enrichment_confidence IS NOT NULL;
-
--- Partitioning for large datasets
-CREATE TABLE receipts_2024 PARTITION OF receipts 
-FOR VALUES FROM ('2024-01-01') TO ('2025-01-01');
-```
-
-#### Caching Strategy
-```typescript
-// Multi-level caching
-class CacheService {
-  // L1: In-memory (Node.js)
-  private memoryCache = new Map();
-  
-  // L2: Redis (shared across instances)
-  private redisClient = new Redis(process.env.REDIS_URL);
-  
-  async get(key: string) {
-    // Check memory first
-    if (this.memoryCache.has(key)) {
-      return this.memoryCache.get(key);
-    }
-    
-    // Then Redis
-    const cached = await this.redisClient.get(key);
-    if (cached) {
-      this.memoryCache.set(key, JSON.parse(cached));
-      return JSON.parse(cached);
-    }
-    
-    return null;
-  }
-}
-```
-
-#### API Rate Limiting & Circuit Breakers
-```typescript
-// OpenAI API circuit breaker
-import { CircuitBreaker } from 'opossum';
-
-const openaiBreaker = new CircuitBreaker(openai.chat.completions.create, {
-  timeout: 10000,
-  errorThresholdPercentage: 50,
-  resetTimeout: 30000
-});
-
-// Graceful degradation
-openaiBreaker.fallback(() => ({
-  brand: 'unknown',
-  category: ['unknown'],
-  confidence: 'low'
-}));
-```
-
-### Monitoring & Observability
-
-#### Metrics to Track
-- **API Metrics**: Request rate, response time, error rate
-- **Database Metrics**: Connection pool usage, query performance, lock waits
-- **Enrichment Metrics**: Queue depth, processing time, AI API success rate
-- **Business Metrics**: Receipts processed per hour, enrichment accuracy
-
-#### Alerting Strategy
-```yaml
-# Example Prometheus alert rules
-groups:
-- name: receipts-service
-  rules:
-  - alert: HighErrorRate
-    expr: rate(http_requests_total{status=~"5.."}[5m]) > 0.1
-    for: 2m
-    labels:
-      severity: warning
-    annotations:
-      summary: "High error rate detected"
-      
-  - alert: EnrichmentQueueBacklog
-    expr: enrichment_queue_size > 1000
-    for: 5m
-    labels:
-      severity: critical
-    annotations:
-      summary: "Enrichment queue backing up"
-```
-
-### Cost Optimization
-
-#### Resource Right-sizing
-- **Development**: Smaller instances, shared databases
-- **Staging**: Production-like but reduced capacity
-- **Production**: Auto-scaling with appropriate limits
-
-#### Serverless for Variable Workloads
-```typescript
-// AWS Lambda for enrichment workers
-export const handler = async (event: SQSEvent) => {
-  for (const record of event.Records) {
-    const receiptData = JSON.parse(record.body);
-    await enrichReceipt(receiptData);
-  }
-};
-```
-
-**Benefits:**
-- Pay only for actual processing time
-- Automatic scaling to zero during idle periods
-- No server management overhead
+- **Horizontal**: API service auto-scaling, database read replicas, worker queues
+- **Vertical**: Instance upgrades during maintenance windows
+- **Optimizations**: Database indexing, multi-level caching, circuit breakers

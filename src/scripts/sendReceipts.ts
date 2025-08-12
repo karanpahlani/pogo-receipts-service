@@ -142,7 +142,7 @@ if (import.meta.url === `file://${process.argv[1]}`) {
         alias: 'e',
         describe: 'API endpoint URL',
         type: 'string',
-        default: 'http://localhost:3000/',
+        default: 'http://localhost:7646/receipt',
       },
       delayMs: {
         alias: 'd',
@@ -165,12 +165,12 @@ if (import.meta.url === `file://${process.argv[1]}`) {
     })
     .example('$0 --dryRun', 'Preview payloads without sending requests')
     .example(
-      '$0 --endpoint http://localhost:8080/api/receipts --delayMs 500',
+      '$0 --endpoint http://localhost:7646/receipt --delayMs 500',
       'Send to custom endpoint with 500ms delay'
     )
     .example('$0 --csvPath ./my-receipts.csv --dryRun', 'Preview payloads from custom CSV file')
     .example(
-      '$0 -f ./data/receipts.csv -e http://localhost:3000/ -d 200',
+      '$0 -f ./data/receipts.csv -e http://localhost:7646/receipt -d 200',
       'Send custom CSV to endpoint with 200ms delay'
     )
     .help()

@@ -15,5 +15,25 @@ services:
       timeout: 5s
       retries: 5
 
+  receipts-service:
+    build: .
+    ports:
+      - '7646:7646'
+    environment:
+      - DATABASE_URL=postgresql://postgres:password@postgres:5432/pogo_data
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
+      - PORT=7646
+      - NODE_ENV=production
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: unless-stopped
+    healthcheck:
+      test: ['CMD', 'node', 'dist/scripts/healthcheck.js']
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
 volumes:
   postgres_data:
