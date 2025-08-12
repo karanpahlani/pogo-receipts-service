@@ -4,6 +4,47 @@ Ingestion and enrichment pipeline for Pogo receipt data, built with TypeScript, 
 
 ## Quick Start
 
+### **🚀 For Graders - 4 Simple Steps:**
+
+**Step 1:** Clone and install
+```bash
+git clone https://github.com/karanpahlani/pogo-receipts-service.git
+cd pogo-receipts-service
+pnpm install
+```
+
+**Step 2:** Setup environment
+```bash
+cp .env.example .env
+```
+
+**Step 3:** Add API key
+```bash
+# Open .env in any text editor and replace this line:
+# OPENAI_API_KEY=your_openai_api_key_here
+# 
+# With the actual API key from your take-home instructions:
+# OPENAI_API_KEY=sk-...your-actual-key...
+```
+
+**Step 4:** Start the service
+```bash
+pnpm start
+```
+
+✅ **Done!** API available at `http://localhost:7646`
+
+### **🧪 Quick Test (Optional)**
+```bash
+# Test the health endpoint
+curl http://localhost:7646/health
+
+# Test receipt ingestion
+curl -X POST http://localhost:7646/ \
+  -H "Content-Type: application/json" \
+  -d '{"merchant_name": "Apple Store", "product_description": "MacBook Pro"}'
+```
+
 ### Prerequisites
 - Node.js 24+
 - Docker and Docker Compose  
@@ -18,13 +59,13 @@ cd pogo-receipts-service
 pnpm install
 ```
 
-2. Configure environment:
+2. **Setup environment:**
 ```bash
 cp .env.example .env
-# Edit .env with your OpenAI API key
+# Edit .env and replace 'your_openai_api_key_here' with your actual API key
 ```
 
-3. Start the database and server:
+3. **Start the service:**
 ```bash
 pnpm start
 ```
