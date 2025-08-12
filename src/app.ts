@@ -2,7 +2,9 @@ import 'dotenv/config';
 import * as express from 'express';
 import { db, receipts } from './db/index.js';
 import { sql, eq } from 'drizzle-orm';
-import { asyncHandler, errorHandler, notFoundHandler } from './middleware/index.js';
+import { asyncHandler, errorHandler, notFoundHandler, validateRequest, validateParams } from './middleware/index.js';
+import { ReceiptInputSchema } from './validation/schemas.js';
+import { z } from 'zod';
 
 export function createApp() {
   const app = express.default();
@@ -31,6 +33,7 @@ export function createApp() {
   // Receipt ingestion endpoint
   app.post(
     '/receipt',
+    validateRequest(ReceiptInputSchema),
     asyncHandler(async (req: any, res: any) => {
       const receiptData = req.body;
       
@@ -97,8 +100,13 @@ export function createApp() {
   );
 
   // Get receipt by receipt_id endpoint
+  const receiptParamsSchema = z.object({
+    receipt_id: z.string().min(1, 'Receipt ID is required')
+  });
+  
   app.get(
     '/receipt/:receipt_id',
+    validateParams(receiptParamsSchema),
     asyncHandler(async (req: any, res: any) => {
       const { receipt_id } = req.params;
       

@@ -65,18 +65,111 @@ Respond in JSON format:
   }
 }
 
-export function standardizeBrand(brand: string): string {
-  if (!brand) return 'unknown';
+export function standardizeBrand(brand: string | null | undefined): string | null {
+  if (!brand) return brand === null ? null : (brand === undefined ? null : '');
   
-  // Basic brand standardization rules
-  return brand
-    .toLowerCase()
+  const trimmed = brand.trim();
+  if (!trimmed) return trimmed;
+  
+  const normalized = trimmed.toLowerCase();
+  
+  // Common brand mappings
+  const brandMappings: Record<string, string> = {
+    'apple': 'Apple',
+    'apple inc': 'Apple',
+    'apple inc.': 'Apple',
+    'amazon': 'Amazon',
+    'amazon.com': 'Amazon',
+    'amazon inc': 'Amazon',
+    'google': 'Google',
+    'google llc': 'Google',
+    'google inc': 'Google',
+    'google inc.': 'Google',
+    'microsoft': 'Microsoft',
+    'microsoft corp': 'Microsoft',
+    'microsoft corporation': 'Microsoft',
+  };
+  
+  // Check exact matches first
+  if (brandMappings[normalized]) {
+    return brandMappings[normalized];
+  }
+  
+  // Basic standardization rules for unknown brands
+  return normalized
     .replace(/\.com$/, '')
     .replace(/\binc\.?$/i, '')
     .replace(/\bllc\.?$/i, '')
-    .replace(/\bcorp\.?$/i, '')
+    .replace(/\bcorp(oration)?\.?$/i, '')
     .replace(/\s+/g, ' ')
     .trim()
+    .split(' ')
+    .map(word => word.charAt(0).toUpperCase() + word.slice(1))
+    .join(' ');
+}
+
+export function parseProductCategory(category: any): any {
+  if (category === null || category === undefined) {
+    return category;
+  }
+  
+  if (Array.isArray(category)) {
+    return [...category]; // Return a copy to avoid mutation
+  }
+  
+  if (typeof category === 'string') {
+    if (!category) return category;
+    
+    // Try to parse as JSON if it looks like an array
+    if (category.trim().startsWith('[') || category.trim().startsWith('{')) {
+      try {
+        return JSON.parse(category);
+      } catch (e) {
+        // If parsing fails, return as string
+        return category;
+      }
+    }
+    return category;
+  }
+  
+  return category;
+}
+
+export function normalizeMerchantName(merchantName: string | null | undefined): string | null {
+  if (!merchantName) return merchantName === null ? null : (merchantName === undefined ? null : '');
+  
+  const trimmed = merchantName.trim();
+  if (!trimmed) return trimmed;
+  
+  const normalized = trimmed.toLowerCase();
+  
+  // Common merchant mappings
+  const merchantMappings: Record<string, string> = {
+    'walmart': 'Walmart',
+    'wal-mart': 'Walmart',
+    'target': 'Target',
+    'target corp': 'Target',
+    'target corporation': 'Target',
+    'amazon': 'Amazon',
+    'amazon.com': 'Amazon',
+    'amazon marketplace': 'Amazon',
+    'amazon fulfillment center': 'Amazon',
+  };
+  
+  // Check for exact matches
+  if (merchantMappings[normalized]) {
+    return merchantMappings[normalized];
+  }
+  
+  // Check for partial matches (store numbers, locations)
+  for (const [key, value] of Object.entries(merchantMappings)) {
+    if (normalized.includes(key)) {
+      return value;
+    }
+  }
+  
+  // Default to title case for unknown merchants
+  return normalized
     .split(' ')
     .map(word => word.charAt(0).toUpperCase() + word.slice(1))
     .join(' ');

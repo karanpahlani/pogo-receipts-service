@@ -145,6 +145,9 @@ export const receipts = pgTable('receipts', {
 - `pnpm start` - Start both PostgreSQL and Node.js service with Docker Compose
 - `pnpm dev` - Start PostgreSQL with Docker, run Node.js locally with hot reload
 - `pnpm build` - Compile TypeScript to JavaScript  
+- `pnpm test` - Run unit tests
+- `pnpm test:integration` - Run integration tests (uses Docker containers)
+- `pnpm test:coverage` - Run tests with coverage report
 - `pnpm db:generate` - Generate database migrations
 - `pnpm db:migrate` - Run database migrations
 - `pnpm db:studio` - Open Drizzle Studio for database management
