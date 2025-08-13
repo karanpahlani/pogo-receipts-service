@@ -324,18 +324,21 @@ docker-compose up --build --force-recreate
 # Health check
 curl http://localhost:7646/health
 
-# Receipt ingestion
+# Receipt ingestion (basic)
 curl -X POST http://localhost:7646/receipt \
   -H "Content-Type: application/json" \
   -d '{"receipt_id": "RCP12345", "merchant_name": "Apple Store", "product_description": "MacBook Pro 13-inch M2", "total_price_paid": 1299.99}'
 
-# Force enrichment (even when brand/category already present)
+# Receipt ingestion with force enrichment (even when brand/category already present)
 curl -X POST "http://localhost:7646/receipt?enrich=true" \
   -H "Content-Type: application/json" \
   -d '{"receipt_id": "RCP12346", "merchant_name": "Apple Store", "product_description": "MacBook Pro 13-inch M2", "brand": "Apple", "product_category": ["Electronics"], "total_price_paid": 1299.99}'
 
-# Retrieve receipt (replace with actual receipt_id)
+# Retrieve receipt by ID
 curl http://localhost:7646/receipt/RCP12345
+
+# Retrieve receipt with force enrichment
+curl http://localhost:7646/receipt/RCP12346
 ```
 
 ## Testing
