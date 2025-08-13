@@ -21,8 +21,7 @@ module.exports = {
   ],
   testPathIgnorePatterns: [
     '/node_modules/',
-    'src/__tests__/database.test.ts',
-    'src/__tests__/integration.test.ts'
+    'src/__tests__/database.test.ts'
   ],
   collectCoverageFrom: [
     'src/**/*.ts',

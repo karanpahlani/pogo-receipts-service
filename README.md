@@ -328,66 +328,29 @@ curl -X POST "http://localhost:7646/receipt?enrich=true" \
 curl http://localhost:7646/receipt/RCP12345
 ```
 
-## Unit Tests (UT) and Integration Tests (IT)
-
-### Running Unit Tests
-Unit tests focus on individual functions and modules in isolation:
+## Testing
 
 ```bash
-# Run all unit tests
-npm run test:unit
+# Run all tests
+pnpm test
 
-# Run unit tests with coverage
-npm test -- --testNamePattern="unit" --coverage
+# Run unit tests only
+pnpm test:unit
 
-# Run unit tests with watch mode
-npm run test:watch -- --testNamePattern="unit"
+# Run integration tests (auto-starts Docker containers)
+pnpm test:integration:docker
 
-# Run specific unit test file
-npm test -- src/__tests__/unit/enrichment.unit.test.ts
+# Run with coverage
+pnpm test:coverage
+
+# Run in watch mode
+pnpm test:watch
 ```
 
-**Unit Test Coverage:**
-- ✅ **Enrichment Service** - AI data enrichment, brand standardization, category parsing
-- ✅ **Validation Schemas** - Request validation, case-insensitive field handling  
-- ✅ **Middleware** - Error handling, async wrapper, validation middleware
-- ✅ **Database Schemas** - Type validation and transformation logic
-
-### Running Integration Tests
-Integration tests verify the complete API workflow with a real database:
-
-```bash
-# Run all integration tests (requires Docker)
-npm run test:integration
-
-# Alternative: Run with Docker setup
-npm run test:integration:docker
-
-# Run with timeout (useful for slow environments)
-npm test -- --testNamePattern="integration" --testTimeout=60000
-```
-
-**Integration Test Coverage:**
-- ✅ **API Endpoints** - Health check, receipt ingestion, retrieval, error handling
-- ✅ **Database Integration** - JSONB handling, timestamps, constraints
-- ✅ **End-to-End Workflow** - Full ingestion → enrichment → storage → retrieval cycle
-
-**Prerequisites for Integration Tests:**
-- Docker and Docker Compose installed
-- Integration tests automatically start their own PostgreSQL container using TestContainers
-- No manual database setup required
-
-### Running All Tests
-```bash
-# Run everything (unit + integration + basic tests)
-npm test
-
-# Run all tests with coverage report  
-npm run test:coverage
-
-# Run tests in CI environment
-npm run test:ci
-```
+**Test Coverage:**
+- Unit tests: AI enrichment, validation, middleware
+- Integration tests: API endpoints, database operations, end-to-end workflow
+- Coverage threshold: 85% statements, 80% branches
 
 ## Features
 

@@ -14,7 +14,6 @@
     "build": "tsc",
     "test": "jest",
     "test:unit": "jest --testPathPattern='\\.unit\\.(test|spec)\\.(ts|js)$'",
-    "test:integration": "jest src/__tests__/integration.testcontainers.test.ts --testTimeout=60000",
     "test:integration:docker": "tsx src/scripts/run-integration-tests.ts",
     "test:api": "jest --testPathPattern='api\\.(test|spec)\\.(ts|js)$'",
     "test:watch": "jest --watch",
