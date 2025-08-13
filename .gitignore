@@ -418,3 +418,9 @@ FodyWeavers.xsd
 *.msp
 
 .DS_Store
+
+# Coverage reports
+coverage/
+
+# Build output
+dist/
