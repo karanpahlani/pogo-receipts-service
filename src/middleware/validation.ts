@@ -1,81 +1,50 @@
 import { Request, Response, NextFunction } from 'express';
 import { z, ZodError } from 'zod';
 
-export function validateRequest(schema: z.ZodSchema) {
-  return (req: Request, res: Response, next: NextFunction) => {
-    try {
-      schema.parse(req.body);
-      next();
-    } catch (error) {
-      if (error instanceof ZodError) {
-        const errorMessages = error.errors.map(err => ({
-          field: err.path.join('.'),
-          message: err.message,
-          code: err.code
-        }));
+// Helper function to create validation middleware
+function createValidator(
+  dataExtractor: (req: Request) => any,
+  errorMessage: string
+) {
+  return (schema: z.ZodSchema) => {
+    return (req: Request, res: Response, next: NextFunction) => {
+      try {
+        schema.parse(dataExtractor(req));
+        next();
+      } catch (error) {
+        if (error instanceof ZodError) {
+          const errorMessages = error.errors.map(err => ({
+            field: err.path.join('.'),
+            message: err.message,
+            code: err.code
+          }));
 
-        return res.status(400).json({
-          error: 'Validation failed',
-          message: 'Request body contains invalid data',
-          details: errorMessages,
-          timestamp: new Date().toISOString()
-        });
+          return res.status(400).json({
+            error: 'Validation failed',
+            message: errorMessage,
+            details: errorMessages,
+            timestamp: new Date().toISOString()
+          });
+        }
+        
+        next(error);
       }
-      
-      // For non-Zod errors, pass to error handler
-      next(error);
-    }
+    };
   };
 }
 
-export function validateParams(schema: z.ZodSchema) {
-  return (req: Request, res: Response, next: NextFunction) => {
-    try {
-      schema.parse(req.params);
-      next();
-    } catch (error) {
-      if (error instanceof ZodError) {
-        const errorMessages = error.errors.map(err => ({
-          field: err.path.join('.'),
-          message: err.message,
-          code: err.code
-        }));
+// Exported validation functions
+export const validateRequest = createValidator(
+  (req) => req.body,
+  'Request body contains invalid data'
+);
 
-        return res.status(400).json({
-          error: 'Validation failed',
-          message: 'Request parameters contain invalid data',
-          details: errorMessages,
-          timestamp: new Date().toISOString()
-        });
-      }
-      
-      next(error);
-    }
-  };
-}
+export const validateParams = createValidator(
+  (req) => req.params,
+  'Request parameters contain invalid data'
+);
 
-export function validateQuery(schema: z.ZodSchema) {
-  return (req: Request, res: Response, next: NextFunction) => {
-    try {
-      schema.parse(req.query);
-      next();
-    } catch (error) {
-      if (error instanceof ZodError) {
-        const errorMessages = error.errors.map(err => ({
-          field: err.path.join('.'),
-          message: err.message,
-          code: err.code
-        }));
-
-        return res.status(400).json({
-          error: 'Validation failed',
-          message: 'Query parameters contain invalid data',
-          details: errorMessages,
-          timestamp: new Date().toISOString()
-        });
-      }
-      
-      next(error);
-    }
-  };
-}
+export const validateQuery = createValidator(
+  (req) => req.query,
+  'Query parameters contain invalid data'
+);

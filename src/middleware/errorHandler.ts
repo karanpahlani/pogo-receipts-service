@@ -14,7 +14,7 @@ interface ErrorResponse {
 
 export interface CustomError extends Error {
   statusCode?: number;
-  status?: number;
+  status?: string;
   isOperational?: boolean;
 }
 

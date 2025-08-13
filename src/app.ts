@@ -42,13 +42,13 @@ export function createApp() {
       // Import enrichment functions
       const { enrichReceiptData, standardizeBrand } = await import('./services/enrichment.js');
       
-      // Extract and parse input data
-      const productDescription = receiptData.product_description || receiptData.PRODUCT_DESCRIPTION;
-      const merchantName = receiptData.merchant_name || receiptData.MERCHANT_NAME;
-      const brand = receiptData.brand || receiptData.BRAND;
+      // Extract input data (validation middleware normalizes to lowercase)
+      const productDescription = receiptData.product_description;
+      const merchantName = receiptData.merchant_name;
+      const brand = receiptData.brand;
       
       // Parse product category - handle both arrays and strings
-      let productCategory = receiptData.product_category || receiptData.PRODUCT_CATEGORY;
+      let productCategory = receiptData.product_category;
       if (typeof productCategory === 'string' && productCategory.startsWith('[')) {
         try {
           productCategory = JSON.parse(productCategory);
@@ -68,17 +68,16 @@ export function createApp() {
       );
       
       if (needsEnrichment) {
-        const productCode = receiptData.product_code || receiptData.PRODUCT_CODE;
         enrichmentResult = await enrichReceiptData(
           productDescription,
           merchantName,
           brand,
-          productCode
+          receiptData.product_code
         );
       }
 
       // Parse total_price_paid as float
-      const totalPricePaid = parseFloat(receiptData.total_price_paid || receiptData.TOTAL_PRICE_PAID || '0');
+      const totalPricePaid = parseFloat(receiptData.total_price_paid || '0');
 
       // Handle missing fields - fill with enriched data if available and confident
       let finalBrand = brand;
@@ -101,19 +100,19 @@ export function createApp() {
         }
       }
 
-      // Insert into database (handle both uppercase and lowercase field names)
+      // Insert into database (validation middleware normalizes field names)
       const insertData = {
-        receiptId: receiptData.receipt_id || receiptData.RECEIPT_ID,
-        productId: receiptData.product_id || receiptData.PRODUCT_ID,
-        receiptCreatedTimestamp: (receiptData.receipt_created_timestamp || receiptData.RECEIPT_CREATED_TIMESTAMP) ? 
-          new Date(receiptData.receipt_created_timestamp || receiptData.RECEIPT_CREATED_TIMESTAMP) : null,
-        merchantName: receiptData.merchant_name || receiptData.MERCHANT_NAME,
-        productDescription: receiptData.product_description || receiptData.PRODUCT_DESCRIPTION,
+        receiptId: receiptData.receipt_id,
+        productId: receiptData.product_id,
+        receiptCreatedTimestamp: receiptData.receipt_created_timestamp ? 
+          new Date(receiptData.receipt_created_timestamp) : null,
+        merchantName: receiptData.merchant_name,
+        productDescription: receiptData.product_description,
         brand: finalBrand,
         productCategory: finalCategory,
         totalPricePaid: isNaN(totalPricePaid) ? null : totalPricePaid,
-        productCode: receiptData.product_code || receiptData.PRODUCT_CODE,
-        productImageUrl: receiptData.product_image_url || receiptData.PRODUCT_IMAGE_URL,
+        productCode: receiptData.product_code,
+        productImageUrl: receiptData.product_image_url,
         // Always store enriched fields, even if low confidence (marked as "unknown")
         enrichedBrand: enrichmentResult ? standardizeBrand(enrichmentResult.brand) : standardizeBrand(brand),
         enrichedCategory: enrichmentResult ? enrichmentResult.category : null,
