@@ -25,6 +25,17 @@ cp .env.example .env
 docker-compose up --build
 ```
 
+> **⚠️ Important for Fresh Machines:** If you encounter "relation receipts missing" errors, this means the database migrations haven't run. The Docker setup now automatically runs migrations on startup, but if you need to run them manually:
+```bash
+# Run migrations manually (if needed)
+pnpm db:migrate
+
+# To simulate a fresh machine (destroy all data and volumes):
+docker compose down -v
+docker compose up --build
+docker system prune -a      # Optional: remove all unused images/cache
+```
+
 The API will be available at `http://localhost:7646`
 
 **📦 Alternative: Local Development**
