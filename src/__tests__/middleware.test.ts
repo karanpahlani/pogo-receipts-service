@@ -6,6 +6,16 @@ import { asyncHandler, errorHandler, notFoundHandler } from '../middleware/index
 const mockRequest = (overrides = {}) => ({
   path: '/test',
   method: 'GET',
+  headers: {
+    'x-request-id': 'test-request-id',
+    'user-agent': 'Jest Test Agent'
+  },
+  get: jest.fn((header: string) => {
+    if (header === 'User-Agent') return 'Jest Test Agent';
+    if (header === 'x-request-id') return 'test-request-id';
+    return undefined;
+  }),
+  ip: '127.0.0.1',
   ...overrides,
 }) as Request;
 
@@ -116,7 +126,10 @@ describe('Middleware Tests', () => {
       
       errorHandler(error, mockReq, mockRes, mockNextFunction);
 
-      expect(consoleSpy).toHaveBeenCalledWith('Error caught by error handler:', error);
+      expect(consoleSpy).toHaveBeenCalledWith('Error occurred:', expect.objectContaining({
+        message: 'Generic error message',
+        method: 'GET'
+      }));
       expect(mockRes.status).toHaveBeenCalledWith(500);
       expect(mockRes.json).toHaveBeenCalledWith({
         error: 'Internal Server Error',
@@ -124,6 +137,7 @@ describe('Middleware Tests', () => {
         timestamp: expect.any(String),
         path: '/test-error',
         status: 500,
+        requestId: 'test-request-id'
       });
     });
 
@@ -140,6 +154,7 @@ describe('Middleware Tests', () => {
         timestamp: expect.any(String),
         path: '/test-error',
         status: 400,
+        requestId: 'test-request-id'
       });
     });
 
@@ -156,6 +171,7 @@ describe('Middleware Tests', () => {
         timestamp: expect.any(String),
         path: '/test-error',
         status: 400,
+        requestId: 'test-request-id'
       });
     });
 
@@ -172,6 +188,7 @@ describe('Middleware Tests', () => {
         timestamp: expect.any(String),
         path: '/test-error',
         status: 409,
+        requestId: 'test-request-id'
       });
     });
 
@@ -188,6 +205,7 @@ describe('Middleware Tests', () => {
         timestamp: expect.any(String),
         path: '/test-error',
         status: 400,
+        requestId: 'test-request-id'
       });
     });
 
@@ -203,6 +221,7 @@ describe('Middleware Tests', () => {
         timestamp: expect.any(String),
         path: '/test-error',
         status: 500,
+        requestId: 'test-request-id'
       });
     });
 
@@ -238,6 +257,7 @@ describe('Middleware Tests', () => {
         timestamp: expect.any(String),
         path: '/non-existent',
         status: 404,
+        requestId: 'test-request-id'
       });
     });
 
@@ -253,6 +273,7 @@ describe('Middleware Tests', () => {
         timestamp: expect.any(String),
         path: '/api/missing',
         status: 404,
+        requestId: 'test-request-id'
       });
     });
 

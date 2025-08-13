@@ -126,6 +126,41 @@ Built with Drizzle ORM for type-safe database operations:
 
 > **Production Database Design**: In a production environment, I would implement a two-table design with `raw_receipts` and `enriched_receipts` to maintain data lineage and enable reprocessing. For this scoped take-home, I'm using a single table with `enriched_*` suffixed fields to demonstrate the functionality while keeping the implementation focused.
 
+### **SQL Schema Definition**
+
+```sql
+-- Generated from Drizzle schema (src/db/schemas.ts)
+CREATE TABLE "receipts" (
+  "id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
+  "receipt_id" text,                          -- Source receipt identifier
+  "product_id" text,                          -- Product line item ID
+  "receipt_created_timestamp" timestamp,       -- Purchase timestamp
+  "merchant_name" text,                       -- Store/merchant name
+  "product_description" text,                 -- Product description
+  "brand" text,                              -- Original/filled brand
+  "product_category" jsonb,                  -- Original/filled category array
+  "total_price_paid" real,                   -- Price paid by customer
+  "product_code" text,                       -- UPC/EAN/SKU code
+  "product_image_url" text,                  -- Product image URL
+  
+  -- AI Enrichment fields (always populated from AI processing)
+  "enriched_brand" text,                     -- Standardized brand name
+  "enriched_category" jsonb,                 -- AI-generated category hierarchy
+  "enriched_upc" text,                       -- Extracted/validated 12-digit UPC
+  "enriched_size" text,                      -- Product size/dimensions
+  "enriched_color" text,                     -- Primary product color
+  "enriched_material" text,                  -- Construction material
+  "enriched_model" text,                     -- Product model/variant
+  "enriched_weight" text,                    -- Product weight with units
+  "enrichment_confidence" text,              -- 'high' | 'medium' | 'low'
+  
+  "created_at" timestamp DEFAULT now(),
+  "updated_at" timestamp DEFAULT now()
+);
+```
+
+### **TypeScript Schema (Drizzle ORM)**
+
 ```typescript
 export const receipts = pgTable('receipts', {
   id: uuid('id').primaryKey().defaultRandom(),
@@ -136,7 +171,7 @@ export const receipts = pgTable('receipts', {
   productDescription: text('product_description'),
   brand: text('brand'),
   productCategory: jsonb('product_category'),
-  totalPricePaid: text('total_price_paid'),
+  totalPricePaid: real('total_price_paid'),
   productCode: text('product_code'),
   productImageUrl: text('product_image_url'),
   // AI Enrichment fields
@@ -154,6 +189,72 @@ export const receipts = pgTable('receipts', {
 });
 ```
 
+### **Database Migrations**
+
+The project uses **Drizzle Kit** for automated schema migrations. All migrations are version-controlled and applied automatically.
+
+#### **Migration History:**
+```bash
+# 0000: Initial receipts table with core fields
+CREATE TABLE receipts (id, receipt_id, product_description, brand, etc.)
+
+# 0001: Updated primary key strategy 
+ALTER TABLE receipts...
+
+# 0002: Added JSONB support for product_category
+ALTER TABLE receipts ALTER COLUMN product_category TYPE jsonb...
+
+# 0003: Added AI enrichment fields
+ALTER TABLE receipts ADD COLUMN enriched_brand text;
+ALTER TABLE receipts ADD COLUMN enriched_category jsonb;
+ALTER TABLE receipts ADD COLUMN enrichment_confidence text;
+
+# 0004: Added UPC enrichment
+ALTER TABLE receipts ADD COLUMN enriched_upc text;
+
+# 0005: Added product detail enrichments  
+ALTER TABLE receipts ADD COLUMN enriched_size text;
+ALTER TABLE receipts ADD COLUMN enriched_color text;
+ALTER TABLE receipts ADD COLUMN enriched_material text;
+ALTER TABLE receipts ADD COLUMN enriched_model text;
+ALTER TABLE receipts ADD COLUMN enriched_weight text;
+```
+
+#### **Migration Commands:**
+```bash
+# Generate migration after schema changes
+pnpm db:generate
+
+# Apply migrations to database
+pnpm db:migrate
+
+# View current schema in browser
+pnpm db:studio
+
+# Reset database (⚠️ destructive)
+docker-compose down -v && docker-compose up --build
+```
+
+#### **Migration Files Location:**
+```
+src/db/migrations/
+├── 0000_tricky_talos.sql           # Initial table creation
+├── 0001_perpetual_killraven.sql    # PK updates  
+├── 0002_quiet_annihilus.sql        # JSONB category
+├── 0003_omniscient_banshee.sql     # Basic enrichment fields
+├── 0004_sudden_outlaw_kid.sql      # UPC field
+├── 0005_sleepy_black_tarantula.sql # Product detail fields
+└── meta/                           # Migration metadata
+    ├── _journal.json               # Migration history
+    └── *.json                      # Snapshots
+```
+
+**Key Design Decisions:**
+- **UUID Primary Keys**: Better for distributed systems
+- **JSONB for Arrays**: Efficient storage and querying for categories
+- **Separate Enriched Fields**: Maintains data lineage and confidence tracking
+- **Nullable Enrichment**: Low confidence results stored as null/"unknown"
+
 ## Development
 
 ### Available Scripts
@@ -163,11 +264,13 @@ export const receipts = pgTable('receipts', {
 - `pnpm test` - Run unit tests
 - `pnpm test:integration` - Run integration tests (uses Docker containers)
 - `pnpm test:coverage` - Run tests with coverage report
-- `pnpm db:generate` - Generate database migrations
-- `pnpm db:migrate` - Run database migrations
-- `pnpm db:studio` - Open Drizzle Studio for database management
 - `pnpm format` - Format code with Prettier
 - `pnpm typecheck` - Run TypeScript type checking
+
+**Database Management:**
+- `pnpm db:generate` - Generate migrations after schema changes
+- `pnpm db:migrate` - Apply pending migrations to database
+- `pnpm db:studio` - Open Drizzle Studio (database GUI)
 
 ### Environment Variables
 ```env
@@ -223,6 +326,67 @@ curl -X POST "http://localhost:7646/receipt?enrich=true" \
 
 # Retrieve receipt (replace with actual receipt_id)
 curl http://localhost:7646/receipt/RCP12345
+```
+
+## Unit Tests (UT) and Integration Tests (IT)
+
+### Running Unit Tests
+Unit tests focus on individual functions and modules in isolation:
+
+```bash
+# Run all unit tests
+npm run test:unit
+
+# Run unit tests with coverage
+npm test -- --testNamePattern="unit" --coverage
+
+# Run unit tests with watch mode
+npm run test:watch -- --testNamePattern="unit"
+
+# Run specific unit test file
+npm test -- src/__tests__/unit/enrichment.unit.test.ts
+```
+
+**Unit Test Coverage:**
+- ✅ **Enrichment Service** - AI data enrichment, brand standardization, category parsing
+- ✅ **Validation Schemas** - Request validation, case-insensitive field handling  
+- ✅ **Middleware** - Error handling, async wrapper, validation middleware
+- ✅ **Database Schemas** - Type validation and transformation logic
+
+### Running Integration Tests
+Integration tests verify the complete API workflow with a real database:
+
+```bash
+# Run all integration tests (requires Docker)
+npm run test:integration
+
+# Alternative: Run with Docker setup
+npm run test:integration:docker
+
+# Run with timeout (useful for slow environments)
+npm test -- --testNamePattern="integration" --testTimeout=60000
+```
+
+**Integration Test Coverage:**
+- ✅ **API Endpoints** - Health check, receipt ingestion, retrieval, error handling
+- ✅ **Database Integration** - JSONB handling, timestamps, constraints
+- ✅ **End-to-End Workflow** - Full ingestion → enrichment → storage → retrieval cycle
+
+**Prerequisites for Integration Tests:**
+- Docker and Docker Compose installed
+- Integration tests automatically start their own PostgreSQL container using TestContainers
+- No manual database setup required
+
+### Running All Tests
+```bash
+# Run everything (unit + integration + basic tests)
+npm test
+
+# Run all tests with coverage report  
+npm run test:coverage
+
+# Run tests in CI environment
+npm run test:ci
 ```
 
 ## Features
@@ -454,3 +618,38 @@ Data Sources          Ingestion           Queue              Workers            
 - **Monitoring**: Queue depth, processing lag, error rates
 
 This evolution maintains the current API contract while enabling multi-source ingestion and production-scale processing.
+
+## Scalability & Maintainability
+
+### **Current Limitations & Solutions**
+
+#### **Scalability Bottlenecks:**
+- **Synchronous AI Processing**: Blocks HTTP responses (2-5s latency)
+  - *Solution*: Message queue + background workers
+- **Single Database**: All operations hit one PostgreSQL instance  
+  - *Solution*: Read replicas for analytics, connection pooling
+- **AI Rate Limits**: OpenAI API throttling at high volume
+  - *Solution*: Request batching, caching common patterns
+
+#### **Maintainability Strengths:**
+- **Type Safety**: Full TypeScript prevents runtime errors
+- **Clear Architecture**: Separate API, business logic, and data layers
+- **Automated Migrations**: Drizzle Kit tracks all schema changes
+- **Docker Setup**: Consistent development/production environments
+- **Modular Design**: Easy to add new enrichment fields or data sources
+
+### **Scaling Strategy**
+```
+Current: 50 receipts/min (ETL, synchronous)
+Target:  1000+ receipts/min (ELT, async queues)
+
+Horizontal Scaling:
+- API servers: Load balancer + multiple Node.js instances  
+- Workers: Auto-scale based on queue depth
+- Database: Read replicas + partitioning by date
+```
+
+### **Monitoring Essentials**
+- **Performance**: API latency, throughput, AI processing time
+- **Reliability**: Error rates, database connection health
+- **Quality**: Enrichment confidence levels, data completeness
