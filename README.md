@@ -262,7 +262,6 @@ src/db/migrations/
 - `pnpm dev` - Start PostgreSQL with Docker, run Node.js locally with hot reload
 - `pnpm build` - Compile TypeScript to JavaScript  
 - `pnpm test` - Run unit tests
-- `pnpm test:integration` - Run integration tests (uses Docker containers)
 - `pnpm test:coverage` - Run tests with coverage report
 - `pnpm format` - Format code with Prettier
 - `pnpm typecheck` - Run TypeScript type checking
