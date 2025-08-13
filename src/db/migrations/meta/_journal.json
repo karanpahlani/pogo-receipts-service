@@ -29,6 +29,20 @@
       "when": 1754987921670,
       "tag": "0003_omniscient_banshee",
       "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1755043485076,
+      "tag": "0004_sudden_outlaw_kid",
+      "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1755044296795,
+      "tag": "0005_sleepy_black_tarantula",
+      "breakpoints": true
     }
   ]
 }

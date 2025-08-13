@@ -5,6 +5,12 @@ import { z } from 'zod';
 const EnrichmentSchema = z.object({
   brand: z.string(),
   category: z.array(z.string()),
+  upc: z.string().nullable(),
+  size: z.string().nullable(),
+  color: z.string().nullable(),
+  material: z.string().nullable(),
+  model: z.string().nullable(),
+  weight: z.string().nullable(),
   confidence: z.enum(['high', 'medium', 'low'])
 });
 
@@ -13,37 +19,60 @@ export type EnrichmentResult = z.infer<typeof EnrichmentSchema>;
 export async function enrichReceiptData(
   productDescription: string,
   merchantName: string,
-  existingBrand?: string
+  existingBrand?: string,
+  existingProductCode?: string
 ): Promise<EnrichmentResult> {
   try {
     const prompt = `
-Analyze this product information and extract/standardize the brand and category:
+Analyze this product information and extract/standardize all available product details:
 
 Product Description: "${productDescription}"
 Merchant: "${merchantName}"
 Existing Brand: "${existingBrand || 'none'}"
+Existing Product Code: "${existingProductCode || 'none'}"
 
-Please provide:
+Please extract and provide:
 1. Brand name (standardized, e.g., "Amazon.com" → "Amazon")
 2. Product category hierarchy (3 levels max, e.g., ["Electronics", "Audio", "Headphones"])
-3. Confidence level (high/medium/low)
+3. UPC code (12-digit Universal Product Code if identifiable)
+4. Size (e.g., "13-inch", "Large", "64GB", "500ml")
+5. Color (e.g., "Space Gray", "Red", "Blue")
+6. Material (e.g., "Cotton", "Aluminum", "Plastic")
+7. Model (e.g., "Pro Max", "Air", "SE")
+8. Weight (e.g., "1.5 lbs", "200g")
+9. Confidence level (high/medium/low)
 
 Rules:
-- If you can't confidently determine brand/category, use "unknown"
+- If you can't confidently determine a field, use "unknown" for strings or null for optional fields
 - Standardize brand names (remove .com, normalize capitalization)
 - Categories should be general → specific
+- UPC should be 12 digits (validate if existing product code looks like UPC)
+- Size should include units when relevant (GB, inches, oz, etc.)
+- Color should be the primary/dominant color
 - Be conservative with confidence ratings
+- Use "unknown" rather than guessing
+
+UPC Validation:
+- UPC-A: 12 digits (most common)
+- If existing product code is 12 digits and follows UPC format, use it
+- Otherwise try to identify UPC from product description or return null
 
 Respond in JSON format:
 {
   "brand": "string",
   "category": ["level1", "level2", "level3"],
+  "upc": "123456789012" or null,
+  "size": "string" or null,
+  "color": "string" or null,
+  "material": "string" or null,
+  "model": "string" or null,
+  "weight": "string" or null,
   "confidence": "high|medium|low"
 }`;
 
     const response = await generateLLMText(prompt, {
       temperature: 0.1,
-      maxTokens: 200,
+      maxTokens: 400,
       model: 'gpt-4o-mini'
     });
 
@@ -60,6 +89,12 @@ Respond in JSON format:
     return {
       brand: existingBrand || 'unknown',
       category: ['unknown'],
+      upc: null,
+      size: null,
+      color: null,
+      material: null,
+      model: null,
+      weight: null,
       confidence: 'low'
     };
   }

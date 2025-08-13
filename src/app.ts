@@ -35,24 +35,17 @@ export function createApp() {
     '/receipt',
     validateRequest(ReceiptInputSchema),
     asyncHandler(async (req: any, res: any) => {
+      // Check for force enrichment query parameter
+      const forceEnrichment = req.query.enrich === 'true';
       const receiptData = req.body;
       
       // Import enrichment functions
       const { enrichReceiptData, standardizeBrand } = await import('./services/enrichment.js');
       
-      // Perform enrichment if we have product description
-      let enrichmentResult;
+      // Extract and parse input data
       const productDescription = receiptData.product_description || receiptData.PRODUCT_DESCRIPTION;
       const merchantName = receiptData.merchant_name || receiptData.MERCHANT_NAME;
       const brand = receiptData.brand || receiptData.BRAND;
-      
-      if (productDescription) {
-        enrichmentResult = await enrichReceiptData(
-          productDescription,
-          merchantName,
-          brand
-        );
-      }
       
       // Parse product category - handle both arrays and strings
       let productCategory = receiptData.product_category || receiptData.PRODUCT_CATEGORY;
@@ -63,9 +56,50 @@ export function createApp() {
           // Keep as string if JSON parsing fails
         }
       }
+      
+      // Perform enrichment based on conditions
+      let enrichmentResult;
+      const needsEnrichment = productDescription && (
+        forceEnrichment || // Force enrichment if query param is set
+        !brand || 
+        !productCategory || 
+        (Array.isArray(productCategory) && productCategory.length === 0) ||
+        (typeof productCategory === 'string' && !productCategory.trim())
+      );
+      
+      if (needsEnrichment) {
+        const productCode = receiptData.product_code || receiptData.PRODUCT_CODE;
+        enrichmentResult = await enrichReceiptData(
+          productDescription,
+          merchantName,
+          brand,
+          productCode
+        );
+      }
 
       // Parse total_price_paid as float
       const totalPricePaid = parseFloat(receiptData.total_price_paid || receiptData.TOTAL_PRICE_PAID || '0');
+
+      // Handle missing fields - fill with enriched data if available and confident
+      let finalBrand = brand;
+      let finalCategory = productCategory;
+      
+      if (enrichmentResult) {
+        // If brand is missing or enrichment is high confidence, use enriched brand
+        if (!brand || enrichmentResult.confidence === 'high') {
+          finalBrand = enrichmentResult.brand !== 'unknown' ? enrichmentResult.brand : brand;
+        }
+        
+        // If category is missing or enrichment is high confidence, use enriched category
+        if ((!productCategory || 
+             (Array.isArray(productCategory) && productCategory.length === 0) ||
+             (typeof productCategory === 'string' && !productCategory.trim())) ||
+            enrichmentResult.confidence === 'high') {
+          finalCategory = enrichmentResult.category.length > 0 && enrichmentResult.category[0] !== 'unknown' 
+            ? enrichmentResult.category 
+            : productCategory;
+        }
+      }
 
       // Insert into database (handle both uppercase and lowercase field names)
       const insertData = {
@@ -75,13 +109,20 @@ export function createApp() {
           new Date(receiptData.receipt_created_timestamp || receiptData.RECEIPT_CREATED_TIMESTAMP) : null,
         merchantName: receiptData.merchant_name || receiptData.MERCHANT_NAME,
         productDescription: receiptData.product_description || receiptData.PRODUCT_DESCRIPTION,
-        brand: receiptData.brand || receiptData.BRAND,
-        productCategory: productCategory,
+        brand: finalBrand,
+        productCategory: finalCategory,
         totalPricePaid: isNaN(totalPricePaid) ? null : totalPricePaid,
         productCode: receiptData.product_code || receiptData.PRODUCT_CODE,
         productImageUrl: receiptData.product_image_url || receiptData.PRODUCT_IMAGE_URL,
-        enrichedBrand: enrichmentResult ? standardizeBrand(enrichmentResult.brand) : null,
+        // Always store enriched fields, even if low confidence (marked as "unknown")
+        enrichedBrand: enrichmentResult ? standardizeBrand(enrichmentResult.brand) : standardizeBrand(brand),
         enrichedCategory: enrichmentResult ? enrichmentResult.category : null,
+        enrichedUpc: enrichmentResult?.upc || null,
+        enrichedSize: enrichmentResult?.size || null,
+        enrichedColor: enrichmentResult?.color || null,
+        enrichedMaterial: enrichmentResult?.material || null,
+        enrichedModel: enrichmentResult?.model || null,
+        enrichedWeight: enrichmentResult?.weight || null,
         enrichmentConfidence: enrichmentResult?.confidence || null,
       };
       
@@ -93,6 +134,12 @@ export function createApp() {
         enrichment: enrichmentResult ? {
           brand: enrichmentResult.brand,
           category: enrichmentResult.category,
+          upc: enrichmentResult.upc,
+          size: enrichmentResult.size,
+          color: enrichmentResult.color,
+          material: enrichmentResult.material,
+          model: enrichmentResult.model,
+          weight: enrichmentResult.weight,
           confidence: enrichmentResult.confidence
         } : null
       });

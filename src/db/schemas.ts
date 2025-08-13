@@ -22,6 +22,12 @@ export const receipts = pgTable(
     // Enrichment fields (separate from core schema but useful for the pipeline)
     enrichedBrand: text('enriched_brand'),
     enrichedCategory: jsonb('enriched_category'), // JSON array
+    enrichedUpc: text('enriched_upc'), // 12-digit UPC code
+    enrichedSize: text('enriched_size'), // Size/dimensions (e.g., "13-inch", "Large", "64GB")
+    enrichedColor: text('enriched_color'), // Primary color
+    enrichedMaterial: text('enriched_material'), // Material (e.g., "Cotton", "Aluminum")
+    enrichedModel: text('enriched_model'), // Model/variant (e.g., "Pro Max", "Air")
+    enrichedWeight: text('enriched_weight'), // Weight with units (e.g., "1.5 lbs", "200g")
     enrichmentConfidence: text('enrichment_confidence'), // 'high' | 'medium' | 'low'
     createdAt: timestamp('created_at').defaultNow(),
     updatedAt: timestamp('updated_at').defaultNow(),
