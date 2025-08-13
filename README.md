@@ -18,8 +18,7 @@ cd pogo-receipts-service
 
 # Setup environment
 cp .env.example .env
-# Edit .env and add your OpenAI API key from:
-# https://share.1password.com/s#JmmPNp2Lvp9Xv4LhCFc0dkHBhFrmTYghI_sg-ko91n0
+# Edit .env and add your OpenAI API key from the link in the email with submission.
 
 # Start everything with Docker (builds automatically on first run)
 docker-compose up --build
@@ -103,6 +102,29 @@ curl -X POST http://localhost:7646/receipt \
 **GET** `/receipt/:receipt_id`
 - Retrieves receipt data by receipt_id
 - **Response:** Complete receipt with enrichment data
+
+## Testing the API
+
+```bash
+# Health check
+curl http://localhost:7646/health
+
+# Receipt ingestion (basic)
+curl -X POST http://localhost:7646/receipt \
+  -H "Content-Type: application/json" \
+  -d '{"receipt_id": "RCP12345", "merchant_name": "Apple Store", "product_description": "MacBook Pro 13-inch M2", "total_price_paid": 1299.99}'
+
+# Receipt ingestion with force enrichment (even when brand/category already present)
+curl -X POST "http://localhost:7646/receipt?enrich=true" \
+  -H "Content-Type: application/json" \
+  -d '{"receipt_id": "RCP12346", "merchant_name": "Apple Store", "product_description": "MacBook Pro 13-inch M2", "brand": "Apple", "product_category": ["Electronics"], "total_price_paid": 1299.99}'
+
+# Retrieve receipt by ID
+curl http://localhost:7646/receipt/RCP12345
+
+# Retrieve receipt with force enrichment
+curl http://localhost:7646/receipt/RCP12346
+```
 
 ## Architecture
 
@@ -317,29 +339,6 @@ docker-compose up --build --force-recreate
 - **Necessary when**: Code changes, Dockerfile changes, or first run
 - **What it does**: Rebuilds the Docker images before starting containers
 - **Skip it when**: No code changes since last build (faster startup)
-
-## Testing the API
-
-```bash
-# Health check
-curl http://localhost:7646/health
-
-# Receipt ingestion (basic)
-curl -X POST http://localhost:7646/receipt \
-  -H "Content-Type: application/json" \
-  -d '{"receipt_id": "RCP12345", "merchant_name": "Apple Store", "product_description": "MacBook Pro 13-inch M2", "total_price_paid": 1299.99}'
-
-# Receipt ingestion with force enrichment (even when brand/category already present)
-curl -X POST "http://localhost:7646/receipt?enrich=true" \
-  -H "Content-Type: application/json" \
-  -d '{"receipt_id": "RCP12346", "merchant_name": "Apple Store", "product_description": "MacBook Pro 13-inch M2", "brand": "Apple", "product_category": ["Electronics"], "total_price_paid": 1299.99}'
-
-# Retrieve receipt by ID
-curl http://localhost:7646/receipt/RCP12345
-
-# Retrieve receipt with force enrichment
-curl http://localhost:7646/receipt/RCP12346
-```
 
 ## Testing
 
