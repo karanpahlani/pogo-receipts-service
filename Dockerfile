@@ -36,9 +36,5 @@ EXPOSE 7646
 HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
   CMD node dist/scripts/healthcheck.js || exit 1
 
-# Copy and setup entrypoint script
-COPY entrypoint.sh .
-RUN chmod +x entrypoint.sh
-
 # Start the application with migrations
-CMD ["./entrypoint.sh"]
+CMD ["sh", "-c", "pnpm db:migrate && node dist/index.js"]
